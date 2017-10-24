@@ -87,10 +87,14 @@ int RasterContainer::LoadRasterSource(const std::string &path_string,
                                       std::size_t nrows,
                                       std::size_t ncols)
 {
+#ifdef _RASTER_GEOTIFF
+    int _xmin, _xmax, _ymin, _ymax;
+#else
     const auto _xmin = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmin}));
     const auto _xmax = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmax}));
     const auto _ymin = static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{ymin}));
     const auto _ymax = static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{ymax}));
+#endif
 
     const auto itr = LoadedSourcePaths.find(path_string);
     if (itr != LoadedSourcePaths.end())
@@ -112,8 +116,34 @@ int RasterContainer::LoadRasterSource(const std::string &path_string,
             path_string, ErrorCode::FileOpenError, SOURCE_REF, "File not found");
     }
 
-    RasterGrid rasterData{filepath, ncols, nrows};
+#ifdef _RASTER_GEOTIFF
+    GDALDataset  *poDataset;
+    double  adfGeoTransform[6];
 
+    GDALAllRegister();
+    poDataset = (GDALDataset *) GDALOpen(path_string.c_str(), GA_ReadOnly);
+    if (!poDataset) {
+        throw util::RuntimeError(
+            path_string, ErrorCode::FileOpenError, SOURCE_REF, "File cannot opened");
+    }
+
+    // Read Data from GeoTIFF
+    ncols = poDataset->GetRasterXSize();
+    nrows = poDataset->GetRasterYSize();
+    RasterGrid rasterData{poDataset, ncols, nrows};
+
+    if (poDataset->GetGeoTransform(adfGeoTransform) == CE_None) {
+        _xmin = static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[0]}));
+        _ymax = static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[3]}));
+        _xmax = _xmin + static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[1] * ncols})); 
+        _ymin = _ymax + static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[5] * nrows}));
+    }
+    GDALClose(poDataset);
+#else
+    RasterGrid rasterData{filepath, ncols, nrows};
+#endif
+
+    util::Log() << "[GeoTIFF loader] Size : " << ncols << " x " << nrows << " [" << _xmin << ", " << _ymin << "]-[" << _xmax << ", " << _ymax << "]";
     RasterSource source{std::move(rasterData), ncols, nrows, _xmin, _xmax, _ymin, _ymax};
     TIMER_STOP(loading_source);
     LoadedSourcePaths.emplace(path_string, source_id);
