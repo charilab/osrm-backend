@@ -594,12 +594,12 @@ function process_segment (profile, segment)
 
   if sourceData.datum ~= invalid and targetData.datum ~= invalid then
     if sourceData.datum > 80 then
-        local rate = sourceData.datum / 400.0
-        scaled_weight = scaled_weight * 0.8
+        local rate = sourceData.datum / 1000.0
+        scaled_weight = scaled_weight * (1.0 - rate)
     end
     if targetData.datum > 80 then
-        local rate = targetData.datum / 400.0
-        scaled_weight = scaled_weight * 0.8
+        local rate = targetData.datum / 1000.0
+        scaled_weight = scaled_weight * (1.0 - rate)
     end
     -- local rate = (targetData.datum + sourceData.datum) / 512.0
     -- scaled_weight = scaled_weight * (1.0 - rate)
