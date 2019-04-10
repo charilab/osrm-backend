@@ -88,7 +88,10 @@ int RasterContainer::LoadRasterSource(const std::string &path_string,
                                       std::size_t ncols)
 {
 #ifdef _RASTER_GEOTIFF
-    int _xmin, _xmax, _ymin, _ymax;
+    auto _xmin = static_cast<int>(util::toFixed(util::FloatLongitude{xmin}));
+    auto _xmax = static_cast<int>(util::toFixed(util::FloatLongitude{xmax}));
+    auto _ymin = static_cast<int>(util::toFixed(util::FloatLatitude{ymin}));
+    auto _ymax = static_cast<int>(util::toFixed(util::FloatLatitude{ymax}));
 #else
     const auto _xmin = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmin}));
     const auto _xmax = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmax}));

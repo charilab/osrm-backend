@@ -68,7 +68,7 @@ class RasterGrid
         for(std::size_t y=0; y<ydim; y++) {
             poBand->RasterIO(GF_Read, 0, y, xdim, 1,
                             buf, xdim, 1, GDT_Byte, 0, 0 );
-            for(int x=0; x<xdim; x++) {
+            for(unsigned int x=0; x<xdim; x++) {
                 _data.push_back((std::int32_t)buf[x]);
             }
         }
