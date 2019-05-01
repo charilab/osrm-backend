@@ -15,14 +15,6 @@
 #include <iterator>
 #include <unordered_map>
 
-#define _RASTER_GEOTIFF 1
-//#define _RASTER_GEOTIFF_FLOAT 1
-
-#ifdef _RASTER_GEOTIFF
-#include <gdal/gdal_priv.h>
-#include <gdal/cpl_conv.h>
-#endif
-
 namespace osrm
 {
 namespace extractor
@@ -46,36 +38,6 @@ struct RasterDatum
 class RasterGrid
 {
   public:
-#ifdef _RASTER_GEOTIFF
-    RasterGrid(GDALDataset* poDataset, std::size_t _xdim, std::size_t _ydim)
-    {
-        xdim = _xdim;
-        ydim = _ydim;
-        _data.reserve(ydim * xdim);
-
-        GDALRasterBand  *poBand = poDataset->GetRasterBand(1);
-#ifdef _RASTER_GEOTIFF_FLOAT
-        float *buf = (float*) CPLMalloc(sizeof(float)*xdim);
-        for(std::size_t y=0; y<ydim; y++) {
-            poBand->RasterIO(GF_Read, 0, y, xdim, 1, buf, xdim, 1, GDT_Float32, 0, 0 );
-            for(std::size_t x=0; x<xdim; x++) {
-                _data.push_back((std::int32_t)buf[x]);
-            }
-        }
-        CPLFree(buf);
-#else
-        std::uint8_t *buf = (std::uint8_t*) CPLMalloc(sizeof(std::uint8_t)*xdim);
-        for(std::size_t y=0; y<ydim; y++) {
-            poBand->RasterIO(GF_Read, 0, y, xdim, 1,
-                            buf, xdim, 1, GDT_Byte, 0, 0 );
-            for(unsigned int x=0; x<xdim; x++) {
-                _data.push_back((std::int32_t)buf[x]);
-            }
-        }
-        CPLFree(buf);
-#endif
-    }
-#else
     RasterGrid(const boost::filesystem::path &filepath, std::size_t _xdim, std::size_t _ydim)
     {
         xdim = _xdim;
@@ -114,7 +76,6 @@ class RasterGrid
                                   SOURCE_REF);
         }
     }
-#endif
 
     RasterGrid(const RasterGrid &) = default;
     RasterGrid &operator=(const RasterGrid &) = default;

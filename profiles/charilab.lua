@@ -13,7 +13,7 @@ function setup()
   local default_speed = 15
   local slowdown_speed = 10
   local walking_speed = 4
-  local raster_path = os.getenv('OSRM_RASTER_SOURCE') or "strava_heatmap.tif"
+  local geotiff_path = os.getenv('OSRM_RASTER_SOURCE') or "strava_heatmap.tif"
 
   return {
     properties = {
@@ -212,7 +212,7 @@ function setup()
       'construction'
     },
 
-    raster_source = raster:load(raster_path,-1,0,0,0,0,0)
+    geotiff_source = geotiff:load(geotiff_path)
   }
 end
 
@@ -681,8 +681,8 @@ function process_turn(profile, turn)
 end
 
 function process_segment (profile, segment)
-  local sourceData = raster:query(profile.raster_source, segment.source.lon, segment.source.lat)
-  local targetData = raster:query(profile.raster_source, segment.target.lon, segment.target.lat)
+  local sourceData = geotiff:query(profile.geotiff_source, segment.source.lon, segment.source.lat)
+  local targetData = geotiff:query(profile.geotiff_source, segment.target.lon, segment.target.lat)
   --io.write("evaluating segment: (" .. segment.source.lon .. ", " .. segment.source.lat .. ") : " .. sourceData.datum .. " " .. targetData.datum .. "\n")
   local invalid = sourceData.invalid_data()
   local scaled_weight = segment.weight

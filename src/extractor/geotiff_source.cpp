@@ -1,4 +1,4 @@
-#include "extractor/raster_source.hpp"
+#include "extractor/geotiff_source.hpp"
 
 #include "util/exception.hpp"
 #include "util/exception_utils.hpp"
@@ -13,7 +13,7 @@ namespace osrm
 namespace extractor
 {
 
-RasterSource::RasterSource(RasterGrid _raster_data,
+GeoTiffSource::GeoTiffSource(GeoTiffGrid _raster_data,
                            std::size_t _width,
                            std::size_t _height,
                            int _xmin,
@@ -28,14 +28,14 @@ RasterSource::RasterSource(RasterGrid _raster_data,
     BOOST_ASSERT(ystep != 0);
 }
 
-float RasterSource::CalcSize(int min, int max, std::size_t count) const
+float GeoTiffSource::CalcSize(int min, int max, std::size_t count) const
 {
     BOOST_ASSERT(count > 0);
     return (max - min) / (static_cast<float>(count) - 1);
 }
 
 // Query raster source for nearest data point
-RasterDatum RasterSource::GetRasterData(const int lon, const int lat) const
+GeoTiffDatum GeoTiffSource::GetGeoTiffData(const int lon, const int lat) const
 {
     if (lon < xmin || lon > xmax || lat < ymin || lat > ymax)
     {
@@ -49,7 +49,7 @@ RasterDatum RasterSource::GetRasterData(const int lon, const int lat) const
 }
 
 // Query raster source using bilinear interpolation
-RasterDatum RasterSource::GetRasterInterpolate(const int lon, const int lat) const
+GeoTiffDatum GeoTiffSource::GetGeoTiffInterpolate(const int lon, const int lat) const
 {
     if (lon < xmin || lon > xmax || lat < ymin || lat > ymax)
     {
@@ -79,19 +79,8 @@ RasterDatum RasterSource::GetRasterInterpolate(const int lon, const int lat) con
 }
 
 // Load raster source into memory
-int RasterContainer::LoadRasterSource(const std::string &path_string,
-                                      double xmin,
-                                      double xmax,
-                                      double ymin,
-                                      double ymax,
-                                      std::size_t nrows,
-                                      std::size_t ncols)
+int GeoTiffContainer::LoadGeoTiffSource(const std::string &path_string)
 {
-    const auto _xmin = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmin}));
-    const auto _xmax = static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{xmax}));
-    const auto _ymin = static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{ymin}));
-    const auto _ymax = static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{ymax}));
-
     const auto itr = LoadedSourcePaths.find(path_string);
     if (itr != LoadedSourcePaths.end())
     {
@@ -112,20 +101,42 @@ int RasterContainer::LoadRasterSource(const std::string &path_string,
             path_string, ErrorCode::FileOpenError, SOURCE_REF, "File not found");
     }
 
-    RasterGrid rasterData{filepath, ncols, nrows};
+    GDALDataset  *poDataset;
+    double  adfGeoTransform[6];
 
-    RasterSource source{std::move(rasterData), ncols, nrows, _xmin, _xmax, _ymin, _ymax};
-    TIMER_STOP(loading_source);
-    LoadedSourcePaths.emplace(path_string, source_id);
-    LoadedSources.push_back(std::move(source));
+    GDALAllRegister();
+    poDataset = (GDALDataset *) GDALOpen(path_string.c_str(), GA_ReadOnly);
+    if (!poDataset) {
+        throw util::RuntimeError(
+            path_string, ErrorCode::FileOpenError, SOURCE_REF, "File cannot opened");
+    }
 
-    util::Log() << "[source loader] ok, after " << TIMER_SEC(loading_source) << "s";
+    // Read Data from GeoTIFF
+    std::size_t ncols = poDataset->GetRasterXSize();
+    std::size_t nrows = poDataset->GetRasterYSize();
+    GeoTiffGrid rasterData{poDataset, ncols, nrows};
+
+    if (poDataset->GetGeoTransform(adfGeoTransform) == CE_None) {
+        auto _xmin = static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[0]}));
+        auto _ymax = static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[3]}));
+        auto _xmax = _xmin + static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[1] * ncols})); 
+        auto _ymin = _ymax + static_cast<int>(util::toFixed(util::FloatLongitude{adfGeoTransform[5] * nrows}));
+
+        util::Log() << "[GeoTIFF loader] Size : " << ncols << " x " << nrows << " [" << _xmin << ", " << _ymin << "]-[" << _xmax << ", " << _ymax << "]";
+        GeoTiffSource source{std::move(rasterData), ncols, nrows, _xmin, _xmax, _ymin, _ymax};
+        TIMER_STOP(loading_source);
+        LoadedSourcePaths.emplace(path_string, source_id);
+        LoadedSources.push_back(std::move(source));
+
+        util::Log() << "[source loader] ok, after " << TIMER_SEC(loading_source) << "s";
+    }
+    GDALClose(poDataset);
 
     return source_id;
 }
 
 // External function for looking up nearest data point from a specified source
-RasterDatum RasterContainer::GetRasterDataFromSource(unsigned int source_id, double lon, double lat)
+GeoTiffDatum GeoTiffContainer::GetGeoTiffDataFromSource(unsigned int source_id, double lon, double lat)
 {
     if (LoadedSources.size() < source_id + 1)
     {
@@ -140,13 +151,13 @@ RasterDatum RasterContainer::GetRasterDataFromSource(unsigned int source_id, dou
     BOOST_ASSERT(lon > -180);
 
     const auto &found = LoadedSources[source_id];
-    return found.GetRasterData(static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{lon})),
+    return found.GetGeoTiffData(static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{lon})),
                                static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{lat})));
 }
 
 // External function for looking up interpolated data from a specified source
-RasterDatum
-RasterContainer::GetRasterInterpolateFromSource(unsigned int source_id, double lon, double lat)
+GeoTiffDatum
+GeoTiffContainer::GetGeoTiffInterpolateFromSource(unsigned int source_id, double lon, double lat)
 {
     if (LoadedSources.size() < source_id + 1)
     {
@@ -161,7 +172,7 @@ RasterContainer::GetRasterInterpolateFromSource(unsigned int source_id, double l
     BOOST_ASSERT(lon > -180);
 
     const auto &found = LoadedSources[source_id];
-    return found.GetRasterInterpolate(
+    return found.GetGeoTiffInterpolate(
         static_cast<std::int32_t>(util::toFixed(util::FloatLongitude{lon})),
         static_cast<std::int32_t>(util::toFixed(util::FloatLatitude{lat})));
 }
