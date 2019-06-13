@@ -4,6 +4,7 @@
 #include "extractor/extraction_relation.hpp"
 #include "extractor/location_dependent_data.hpp"
 #include "extractor/raster_source.hpp"
+#include "extractor/geotiff_source.hpp"
 #include "extractor/scripting_environment.hpp"
 
 #include <tbb/enumerable_thread_specific.h>
@@ -36,6 +37,7 @@ struct LuaScriptingContext final
 
     ProfileProperties properties;
     RasterContainer raster_sources;
+    GeoTiffContainer geotiff_sources;
     sol::state state;
 
     bool has_turn_penalty_function;
