@@ -11,6 +11,7 @@
 #include "extractor/profile_properties.hpp"
 #include "extractor/query_node.hpp"
 #include "extractor/raster_source.hpp"
+#include "extractor/geotiff_source.hpp"
 #include "extractor/restriction_parser.hpp"
 
 #include "guidance/turn_instruction.hpp"
@@ -192,6 +193,14 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
                                                 &RasterContainer::GetRasterDataFromSource,
                                                 "interpolate",
                                                 &RasterContainer::GetRasterInterpolateFromSource);
+
+    context.state.new_usertype<GeoTiffContainer>("geotiff",
+                                                "load",
+                                                &GeoTiffContainer::LoadGeoTiffSource,
+                                                "query",
+                                                &GeoTiffContainer::GetGeoTiffDataFromSource,
+                                                "interpolate",
+                                                &GeoTiffContainer::GetGeoTiffInterpolateFromSource);
 
     context.state.new_usertype<ProfileProperties>(
         "ProfileProperties",
@@ -469,6 +478,9 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
     context.state.new_usertype<RasterDatum>(
         "RasterDatum", "datum", &RasterDatum::datum, "invalid_data", &RasterDatum::get_invalid);
 
+    context.state.new_usertype<GeoTiffDatum>(
+        "GeoTiffDatum", "datum", &GeoTiffDatum::datum, "invalid_data", &GeoTiffDatum::get_invalid);
+
     // the "properties" global is only used in v1 of the api, but we don't know
     // the version until we have read the file. so we have to declare it in any case.
     // we will then clear it for v2 profiles after reading the file
@@ -513,6 +525,7 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
 
         // setup helpers
         context.state["raster"] = &context.raster_sources;
+        context.state["geotiff"] = &context.geotiff_sources;
 
         // set constants
         context.state.new_enum("constants",
@@ -810,6 +823,7 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
 
         // setup helpers
         context.state["sources"] = &context.raster_sources;
+        context.state["geotiff"] = &context.geotiff_sources;
 
         // set constants
         context.state.new_enum("constants", "precision", COORDINATE_PRECISION);
